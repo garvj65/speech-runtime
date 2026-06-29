@@ -48,6 +48,13 @@ export type TranscriptQualityMetrics = {
   reason?: string;
 };
 
+export type CerMetricResult = {
+  cer: number | null;
+  normalizedExpectedTranscript: string | null;
+  normalizedPredictedTranscript: string;
+  reason?: string;
+};
+
 export type VadSummaryMetrics = {
   speechSegments: SpeechSegment[];
   speechSegmentCount: number;

@@ -14,6 +14,16 @@ export function summarizeVadSegments(params: {
     typeof audioDurationMs === "number" && Number.isFinite(audioDurationMs) && audioDurationMs > 0;
   const warnings: string[] = [];
 
+  if (audioDurationMs == null) {
+    warnings.push(
+      "Audio duration is unavailable; silence duration and speech ratio were not calculated."
+    );
+  } else if (!Number.isFinite(audioDurationMs) || audioDurationMs <= 0) {
+    warnings.push(
+      "Audio duration is invalid; silence duration and speech ratio were not calculated."
+    );
+  }
+
   if (speechSegments.length === 0) {
     warnings.push("No speech segments detected.");
   }

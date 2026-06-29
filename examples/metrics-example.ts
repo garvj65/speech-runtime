@@ -6,7 +6,7 @@ const predictedTranscript =
   "Haan payment link WhatsApp pe bhej do main sham tak pay kar dunga";
 
 const wordMetrics = calculateWer(expectedTranscript, predictedTranscript);
-const characterErrorRate = calculateCer(expectedTranscript, predictedTranscript);
+const characterMetrics = calculateCer(expectedTranscript, predictedTranscript);
 const vadSummary = summarizeVadSegments({
   audioDurationMs: 4200,
   speechSegments: [
@@ -21,7 +21,8 @@ const vadSummary = summarizeVadSegments({
 console.log({
   wordMetrics: {
     ...wordMetrics,
-    cer: characterErrorRate,
+    cer: characterMetrics.cer,
   },
+  characterMetrics,
   vadSummary,
 });

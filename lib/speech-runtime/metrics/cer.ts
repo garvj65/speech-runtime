@@ -1,28 +1,49 @@
+import type { CerMetricResult } from "../types";
 import { normalizeTranscript } from "./normalizeTranscript";
 
 export function calculateCer(
   expectedTranscript: string | null | undefined,
   predictedTranscript: string
-): number | null {
+): CerMetricResult {
+  const normalizedPredictedTranscript = normalizeTranscript(predictedTranscript);
+
   if (expectedTranscript == null) {
-    return null;
+    return {
+      cer: null,
+      normalizedExpectedTranscript: null,
+      normalizedPredictedTranscript,
+      reason: "Expected transcript is required for CER.",
+    };
   }
 
   const normalizedExpectedTranscript = normalizeTranscript(expectedTranscript);
-  const normalizedPredictedTranscript = normalizeTranscript(predictedTranscript);
 
   if (normalizedExpectedTranscript.length === 0) {
-    return null;
+    return {
+      cer: null,
+      normalizedExpectedTranscript,
+      normalizedPredictedTranscript,
+      reason: "Expected transcript is empty.",
+    };
   }
 
   if (normalizedPredictedTranscript.length === 0) {
-    return 1;
+    return {
+      cer: 1,
+      normalizedExpectedTranscript,
+      normalizedPredictedTranscript,
+      reason: "ASR returned an empty transcript.",
+    };
   }
 
   const expectedCharacters = Array.from(normalizedExpectedTranscript);
   const predictedCharacters = Array.from(normalizedPredictedTranscript);
 
-  return calculateEditDistance(expectedCharacters, predictedCharacters) / expectedCharacters.length;
+  return {
+    cer: calculateEditDistance(expectedCharacters, predictedCharacters) / expectedCharacters.length,
+    normalizedExpectedTranscript,
+    normalizedPredictedTranscript,
+  };
 }
 
 function calculateEditDistance(expected: string[], predicted: string[]): number {
