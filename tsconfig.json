@@ -17,6 +17,7 @@
     "lib/**/*.ts",
     "examples/**/*.ts",
     "tests/**/*.ts",
+    "server/**/*.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
     "vite.config.ts"
