@@ -1,0 +1,125 @@
+{
+  "schemaVersion": "speech-runtime-ground-truths-v0",
+  "groundTruthSetId": "speech_runtime_lab_ground_truths_v0",
+  "project": "Speech Runtime Lab v0",
+  "description": "Initial multilingual ground-truth set for testing VAD + ASR quality across English, Hindi, and Hinglish.",
+  "primaryLanguages": ["english", "hindi", "hinglish"],
+  "canonicalScriptRules": {
+    "english": "latin",
+    "hindi": "devanagari",
+    "hinglish": "latin"
+  },
+  "metricsNote": "WER, CER, and word accuracy must only be calculated when a ground truth item is selected. Hindi and Hinglish may require normalized WER later because Devanagari and Romanized transcripts can represent similar meaning with different scripts.",
+  "items": [
+    {
+      "id": "truth_001",
+      "languageMode": "english",
+      "scriptType": "latin",
+      "expectedTranscript": "Hello everyone. Today we are testing speech recognition.",
+      "testPurpose": "Clean English baseline.",
+      "difficulty": "easy",
+      "tags": ["english", "clean", "baseline", "speech-recognition"],
+      "targetAspects": ["basic_transcription", "clean_audio", "english_accuracy"],
+      "notes": "Use this as the simplest first sanity check for the ASR pipeline."
+    },
+    {
+      "id": "truth_002",
+      "languageMode": "english",
+      "scriptType": "latin",
+      "expectedTranscript": "My order number is A one seven five nine. Please check the delivery status.",
+      "testPurpose": "English alphanumeric and order ID capture.",
+      "difficulty": "medium",
+      "tags": ["english", "order-id", "alphanumeric", "delivery"],
+      "targetAspects": ["entity_capture", "order_number_capture", "letter_digit_sequence"],
+      "notes": "Useful for testing whether ASR preserves letter and number sequences clearly."
+    },
+    {
+      "id": "truth_003",
+      "languageMode": "english",
+      "scriptType": "latin",
+      "expectedTranscript": "I will pay tomorrow, but please send the payment link on WhatsApp.",
+      "testPurpose": "English business intent with payment and WhatsApp entities.",
+      "difficulty": "easy",
+      "tags": ["english", "payment", "whatsapp", "business-intent"],
+      "targetAspects": ["intent_capture", "payment_intent", "channel_entity_capture"],
+      "notes": "Represents a common commerce or collections call utterance."
+    },
+    {
+      "id": "truth_004",
+      "languageMode": "hindi",
+      "scriptType": "devanagari",
+      "expectedTranscript": "नमस्ते, मुझे अपने ऑर्डर की डिलीवरी स्थिति जाननी है।",
+      "testPurpose": "Clean Hindi baseline with delivery intent.",
+      "difficulty": "easy",
+      "tags": ["hindi", "clean", "delivery", "baseline"],
+      "targetAspects": ["hindi_accuracy", "delivery_intent", "devanagari_transcription"],
+      "notes": "Canonical truth is Devanagari. Raw WER should compare against this exact script."
+    },
+    {
+      "id": "truth_005",
+      "languageMode": "hindi",
+      "scriptType": "devanagari",
+      "expectedTranscript": "कृपया मुझे पेमेंट लिंक व्हाट्सएप पर भेज दीजिए।",
+      "testPurpose": "Hindi sentence with common English business terms.",
+      "difficulty": "medium",
+      "tags": ["hindi", "payment", "whatsapp", "mixed-terms"],
+      "targetAspects": ["hindi_accuracy", "english_entity_in_hindi", "payment_intent"],
+      "notes": "Tests whether ASR handles Hindi speech containing business terms like payment link and WhatsApp."
+    },
+    {
+      "id": "truth_006",
+      "languageMode": "hindi",
+      "scriptType": "devanagari",
+      "expectedTranscript": "मेरा मोबाइल नंबर नौ आठ सात छह पांच चार तीन दो एक शून्य है।",
+      "testPurpose": "Hindi mobile number capture.",
+      "difficulty": "medium",
+      "tags": ["hindi", "number-capture", "mobile-number"],
+      "targetAspects": ["number_capture", "hindi_digits", "field_capture"],
+      "notes": "Important for testing phone numbers, IDs, policy numbers, and other digit-heavy call flows."
+    },
+    {
+      "id": "truth_007",
+      "languageMode": "hinglish",
+      "scriptType": "latin",
+      "expectedTranscript": "Mera order kal deliver ho jayega kya?",
+      "testPurpose": "Simple Hinglish delivery question.",
+      "difficulty": "easy",
+      "tags": ["hinglish", "delivery", "question", "baseline"],
+      "targetAspects": ["hinglish_accuracy", "question_detection", "delivery_intent"],
+      "notes": "Canonical Hinglish truth is Roman script."
+    },
+    {
+      "id": "truth_008",
+      "languageMode": "hinglish",
+      "scriptType": "latin",
+      "expectedTranscript": "Haan, payment link WhatsApp pe bhej do, main shaam tak pay kar dunga.",
+      "testPurpose": "Hinglish payment intent with WhatsApp entity.",
+      "difficulty": "medium",
+      "tags": ["hinglish", "payment", "whatsapp", "business-intent"],
+      "targetAspects": ["hinglish_accuracy", "payment_intent", "channel_entity_capture"],
+      "notes": "Tests code-mixed business speech that is common in Indian customer calls."
+    },
+    {
+      "id": "truth_009",
+      "languageMode": "hinglish",
+      "scriptType": "latin",
+      "expectedTranscript": "Ek second, mujhe samajh nahi aaya, number ke aage kya likha hai?",
+      "testPurpose": "Hinglish hesitation and unclear field reference.",
+      "difficulty": "hard",
+      "tags": ["hinglish", "hesitation", "field-reference", "unclear"],
+      "targetAspects": ["hesitation_handling", "field_reference_capture", "hinglish_accuracy"],
+      "notes": "Useful for testing messy real-call utterances where the user is confused or reading something unclear."
+    },
+    {
+      "id": "truth_010",
+      "languageMode": "hinglish",
+      "scriptType": "latin",
+      "expectedTranscript": "Haan haan, main sun raha hoon, aap continue karo.",
+      "testPurpose": "Hinglish backchannel and acknowledgement.",
+      "difficulty": "medium",
+      "tags": ["hinglish", "backchannel", "acknowledgement", "turn-taking"],
+      "targetAspects": ["backchannel_detection", "short_user_activity", "turn_taking"],
+      "notes": "Important for later VAD/turn-taking tests. This should not automatically be treated as a full user intent."
+    }
+  ]
+}
