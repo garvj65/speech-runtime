@@ -256,6 +256,116 @@ button:disabled {
   margin-bottom: 18px;
 }
 
+.vad-controls {
+  margin-bottom: 18px;
+  border: 1px solid #e3e9ef;
+  border-radius: 8px;
+  background: #fbfcfe;
+  padding: 14px;
+}
+
+.vad-controls select {
+  margin-bottom: 10px;
+}
+
+.vad-controls p,
+.vad-panel-heading p,
+.vad-disabled {
+  margin-bottom: 0;
+  color: #64748b;
+}
+
+.vad-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  border-top: 1px solid #e3e9ef;
+  padding-top: 18px;
+}
+
+.vad-panel-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.vad-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.vad-summary-grid div {
+  min-width: 0;
+  border: 1px solid #e3e9ef;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.vad-summary-grid span {
+  display: block;
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.vad-summary-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #172033;
+  font-size: 0.92rem;
+}
+
+.vad-error,
+.vad-warning-list {
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.vad-error {
+  margin-bottom: 0;
+  border: 1px solid #f6c6c6;
+  background: #fff5f5;
+  color: #9f1239;
+}
+
+.vad-warning-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+  padding-left: 30px;
+}
+
+.vad-segment-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.vad-segment-list li {
+  border: 1px solid #e3e9ef;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.vad-segment-list span {
+  display: inline-block;
+  margin-right: 12px;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .playback audio {
   width: 100%;
 }
@@ -369,7 +479,8 @@ button:disabled {
 
   .grid,
   .metadata-grid,
-  .normalized-grid {
+  .normalized-grid,
+  .vad-summary-grid {
     grid-template-columns: 1fr;
   }
 
@@ -378,6 +489,10 @@ button:disabled {
   }
 
   .panel-heading {
+    display: grid;
+  }
+
+  .vad-panel-heading {
     display: grid;
   }
 }
