@@ -29,6 +29,23 @@ type RecordingMetadata = {
   durationMs: number | null;
 };
 
+type TranscriptionStatus = "idle" | "transcribing" | "complete" | "error";
+
+type AsrTranscriptionResult = {
+  provider: string;
+  model: string;
+  predictedTranscript: string;
+  languageDetected: string | null;
+  confidence: number | null;
+  durationMs: number | null;
+  latencyMs: number;
+};
+
+type TranscriptionResponse = {
+  selectedGroundTruthId: string | null;
+  asr: AsrTranscriptionResult;
+};
+
 const groundTruths = (groundTruthData as GroundTruthSet).items;
 const emptyMetadata: RecordingMetadata = {
   mimeType: null,
@@ -40,12 +57,46 @@ function formatValue(value: string | number | null): string {
   return value === null ? "Not recorded" : String(value);
 }
 
+function formatOptionalValue(value: string | number | null): string {
+  return value === null ? "not provided" : String(value);
+}
+
+function getRecordingFilename(mimeType: string | null): string {
+  if (mimeType?.includes("wav")) {
+    return "recording.wav";
+  }
+
+  if (mimeType?.includes("mp4")) {
+    return "recording.mp4";
+  }
+
+  if (mimeType?.includes("ogg")) {
+    return "recording.ogg";
+  }
+
+  return "recording.webm";
+}
+
+function isTranscriptionResponse(
+  responseBody: TranscriptionResponse | { error?: string }
+): responseBody is TranscriptionResponse {
+  return "asr" in responseBody;
+}
+
 function App() {
   const [selectedId, setSelectedId] = useState(groundTruths[0]?.id ?? "");
   const [status, setStatus] = useState<RecordingStatus>("idle");
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<RecordingMetadata>(emptyMetadata);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [transcriptionStatus, setTranscriptionStatus] =
+    useState<TranscriptionStatus>("idle");
+  const [transcriptionResult, setTranscriptionResult] =
+    useState<TranscriptionResponse | null>(null);
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(
+    null
+  );
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -93,8 +144,12 @@ function App() {
       discardOnStopRef.current = false;
     }
     setAudioUrl(null);
+    setAudioBlob(null);
     setMetadata(emptyMetadata);
     setErrorMessage(null);
+    setTranscriptionStatus("idle");
+    setTranscriptionResult(null);
+    setTranscriptionError(null);
     setStatus("idle");
   }
 
@@ -114,8 +169,12 @@ function App() {
     try {
       setStatus("requesting_permission");
       setErrorMessage(null);
+      setTranscriptionStatus("idle");
+      setTranscriptionResult(null);
+      setTranscriptionError(null);
       revokeAudioUrl();
       setAudioUrl(null);
+      setAudioBlob(null);
       setMetadata(emptyMetadata);
       chunksRef.current = [];
       discardOnStopRef.current = false;
@@ -151,6 +210,7 @@ function App() {
         const nextAudioUrl = URL.createObjectURL(blob);
 
         audioUrlRef.current = nextAudioUrl;
+        setAudioBlob(blob);
         setAudioUrl(nextAudioUrl);
         setMetadata({
           mimeType,
@@ -170,6 +230,61 @@ function App() {
         error instanceof Error
           ? `Microphone recording could not start: ${error.message}`
           : "Microphone recording could not start."
+      );
+    }
+  }
+
+  async function transcribeRecording() {
+    if (!audioBlob) {
+      setTranscriptionStatus("error");
+      setTranscriptionError("Record audio before transcribing.");
+      setTranscriptionResult(null);
+      return;
+    }
+
+    try {
+      setTranscriptionStatus("transcribing");
+      setTranscriptionError(null);
+      setTranscriptionResult(null);
+
+      const formData = new FormData();
+      formData.append(
+        "audio",
+        audioBlob,
+        getRecordingFilename(metadata.mimeType)
+      );
+
+      if (selectedGroundTruth?.id) {
+        formData.append("selectedGroundTruthId", selectedGroundTruth.id);
+      }
+
+      if (selectedGroundTruth?.languageMode) {
+        formData.append("languageHint", selectedGroundTruth.languageMode);
+      }
+
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData
+      });
+      const responseBody = (await response.json()) as
+        | TranscriptionResponse
+        | { error?: string };
+
+      if (!response.ok || !isTranscriptionResponse(responseBody)) {
+        throw new Error(
+          "error" in responseBody && responseBody.error
+            ? responseBody.error
+            : "Transcription failed."
+        );
+      }
+
+      setTranscriptionResult(responseBody);
+      setTranscriptionStatus("complete");
+    } catch (error) {
+      setTranscriptionStatus("error");
+      setTranscriptionResult(null);
+      setTranscriptionError(
+        error instanceof Error ? error.message : "Transcription failed."
       );
     }
   }
@@ -294,9 +409,23 @@ function App() {
             >
               Clear recording
             </button>
+            <button
+              type="button"
+              onClick={transcribeRecording}
+              disabled={
+                status === "recording" ||
+                !audioBlob ||
+                transcriptionStatus === "transcribing"
+              }
+            >
+              Transcribe recording
+            </button>
           </div>
 
           {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
+          {transcriptionError ? (
+            <p className="error-message">{transcriptionError}</p>
+          ) : null}
 
           <div className="metadata-grid recording-grid">
             <div>
@@ -319,6 +448,10 @@ function App() {
               <span>Selected ground truth ID</span>
               <strong>{selectedGroundTruth?.id ?? "None"}</strong>
             </div>
+            <div>
+              <span>Transcription status</span>
+              <strong>{transcriptionStatus}</strong>
+            </div>
           </div>
 
           {audioUrl ? (
@@ -331,11 +464,64 @@ function App() {
       </section>
 
       <section className="panel result-panel">
-        <h2>Future ASR / VAD / Metrics Result</h2>
-        <p>
-          No ASR, VAD, upload, or provider call runs in this task. This panel is
-          reserved for the next implementation slices.
-        </p>
+        <div className="panel-heading">
+          <div>
+            <h2>ASR transcript result</h2>
+            <p>
+              VAD and WER/CER metrics are not run in this task. This task only
+              returns the first ASR transcript.
+            </p>
+          </div>
+          <span className={`status-pill status-${transcriptionStatus}`}>
+            {transcriptionStatus}
+          </span>
+        </div>
+
+        {transcriptionResult ? (
+          <div className="transcription-stack">
+            <div className="metadata-grid">
+              <div>
+                <span>Provider</span>
+                <strong>{transcriptionResult.asr.provider}</strong>
+              </div>
+              <div>
+                <span>Model</span>
+                <strong>{transcriptionResult.asr.model}</strong>
+              </div>
+              <div>
+                <span>Latency ms</span>
+                <strong>{transcriptionResult.asr.latencyMs}</strong>
+              </div>
+              <div>
+                <span>Ground truth ID</span>
+                <strong>{transcriptionResult.selectedGroundTruthId ?? "None"}</strong>
+              </div>
+              <div>
+                <span>Language detected</span>
+                <strong>
+                  {formatOptionalValue(transcriptionResult.asr.languageDetected)}
+                </strong>
+              </div>
+              <div>
+                <span>Confidence</span>
+                <strong>
+                  {formatOptionalValue(transcriptionResult.asr.confidence)}
+                </strong>
+              </div>
+            </div>
+
+            <div>
+              <span className="field-label">Predicted transcript</span>
+              <p className="transcript-box predicted-transcript">
+                {transcriptionResult.asr.predictedTranscript}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="empty-result">
+            Record audio, then transcribe it through the local API server.
+          </p>
+        )}
       </section>
     </main>
   );
