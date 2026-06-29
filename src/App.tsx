@@ -1,12 +1,32 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import groundTruthData from "../research/speech-runtime-lab/ground_truths.v0.json";
 
+type VadWebModule = typeof import("@ricky0123/vad-web");
+type MicVadInstance = Awaited<ReturnType<VadWebModule["MicVAD"]["new"]>>;
+
 type RecordingStatus =
   | "idle"
   | "requesting_permission"
   | "recording"
   | "stopped"
   | "error";
+
+type VadMode = "none" | "silero";
+
+type VadStatus =
+  | "idle"
+  | "disabled"
+  | "loading"
+  | "ready"
+  | "running"
+  | "stopped"
+  | "error";
+
+type VadSpeechSegment = {
+  startMs: number;
+  endMs: number;
+  durationMs: number;
+};
 
 type GroundTruthItem = {
   id: string;
@@ -67,6 +87,16 @@ type TranscriptionResponse = {
   transcriptQuality: TranscriptQualityMetrics;
 };
 
+type VadSummary = {
+  speechSegmentCount: number;
+  detectedSpeechDurationMs: number;
+  detectedSilenceDurationMs: number | null;
+  speechRatio: number | null;
+  warnings: string[];
+};
+
+const vadAssetBasePath = "/node_modules/@ricky0123/vad-web/dist/";
+const onnxWasmBasePath = "/node_modules/onnxruntime-web/dist/";
 const groundTruths = (groundTruthData as GroundTruthSet).items;
 const emptyMetadata: RecordingMetadata = {
   mimeType: null,
@@ -92,6 +122,52 @@ function formatMetricPercent(value: number | null): string {
 
 function formatCountMetric(value: number | null): string {
   return value === null ? "not available" : String(value);
+}
+
+function summarizeVadSegments(params: {
+  audioDurationMs: number | null;
+  speechSegments: VadSpeechSegment[];
+}): VadSummary {
+  const detectedSpeechDurationMs = params.speechSegments.reduce(
+    (total, segment) => total + segment.durationMs,
+    0
+  );
+  const audioDurationMs = params.audioDurationMs;
+  const hasValidAudioDuration =
+    typeof audioDurationMs === "number" &&
+    Number.isFinite(audioDurationMs) &&
+    audioDurationMs > 0;
+  const warnings: string[] = [];
+
+  if (audioDurationMs == null) {
+    warnings.push(
+      "Audio duration is unavailable; silence duration and speech ratio were not calculated."
+    );
+  } else if (!Number.isFinite(audioDurationMs) || audioDurationMs <= 0) {
+    warnings.push(
+      "Audio duration is invalid; silence duration and speech ratio were not calculated."
+    );
+  }
+
+  if (params.speechSegments.length === 0) {
+    warnings.push("No speech segments detected.");
+  }
+
+  if (hasValidAudioDuration && detectedSpeechDurationMs > audioDurationMs) {
+    warnings.push("Detected speech duration exceeds audio duration.");
+  }
+
+  return {
+    speechSegmentCount: params.speechSegments.length,
+    detectedSpeechDurationMs,
+    detectedSilenceDurationMs: hasValidAudioDuration
+      ? Math.max(0, audioDurationMs - detectedSpeechDurationMs)
+      : null,
+    speechRatio: hasValidAudioDuration
+      ? detectedSpeechDurationMs / audioDurationMs
+      : null,
+    warnings
+  };
 }
 
 function formatTokenDiffOperation(operation: TokenDiffOperation): string {
@@ -146,25 +222,57 @@ function App() {
   const [transcriptionError, setTranscriptionError] = useState<string | null>(
     null
   );
+  const [vadMode, setVadMode] = useState<VadMode>("none");
+  const [vadStatus, setVadStatus] = useState<VadStatus>("disabled");
+  const [vadError, setVadError] = useState<string | null>(null);
+  const [vadSegments, setVadSegments] = useState<VadSpeechSegment[]>([]);
+  const [recordingElapsedMs, setRecordingElapsedMs] = useState<number | null>(
+    null
+  );
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const vadRef = useRef<MicVadInstance | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const audioUrlRef = useRef<string | null>(null);
   const startedAtRef = useRef<number | null>(null);
+  const openVadSegmentStartedAtRef = useRef<number | null>(null);
+  const vadRunIdRef = useRef(0);
   const discardOnStopRef = useRef(false);
 
   const selectedGroundTruth = useMemo(
     () => groundTruths.find((item) => item.id === selectedId) ?? groundTruths[0],
     [selectedId]
   );
+  const vadSummary = useMemo(
+    () =>
+      summarizeVadSegments({
+        audioDurationMs: metadata.durationMs ?? recordingElapsedMs,
+        speechSegments: vadSegments
+      }),
+    [metadata.durationMs, recordingElapsedMs, vadSegments]
+  );
 
   useEffect(() => {
     return () => {
+      vadRunIdRef.current += 1;
+      void cleanupVadInstance();
       cleanupRecorder();
       revokeAudioUrl();
     };
   }, []);
+
+  useEffect(() => {
+    if (status !== "recording") {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setRecordingElapsedMs(getRecordingElapsedMs());
+    }, 250);
+
+    return () => window.clearInterval(timer);
+  }, [status]);
 
   function revokeAudioUrl() {
     if (audioUrlRef.current) {
@@ -179,12 +287,131 @@ function App() {
     mediaRecorderRef.current = null;
   }
 
+  async function cleanupVadInstance() {
+    const vad = vadRef.current;
+    vadRef.current = null;
+
+    if (!vad) {
+      return;
+    }
+
+    try {
+      if (vad.listening) {
+        await vad.pause();
+      }
+      await vad.destroy();
+    } catch {
+      // Cleanup is best-effort because MicVAD may fail before full initialization.
+    }
+  }
+
+  function getRecordingElapsedMs() {
+    return startedAtRef.current === null
+      ? null
+      : Math.max(0, Math.round(performance.now() - startedAtRef.current));
+  }
+
+  function closeOpenVadSegment(endMs: number | null = getRecordingElapsedMs()) {
+    const startMs = openVadSegmentStartedAtRef.current;
+
+    if (startMs === null || endMs === null) {
+      openVadSegmentStartedAtRef.current = null;
+      return;
+    }
+
+    const normalizedEndMs = Math.max(startMs, endMs);
+    openVadSegmentStartedAtRef.current = null;
+    setVadSegments((segments) => [
+      ...segments,
+      {
+        startMs,
+        endMs: normalizedEndMs,
+        durationMs: normalizedEndMs - startMs
+      }
+    ]);
+  }
+
+  async function startSileroVad(runId: number) {
+    try {
+      await cleanupVadInstance();
+      setVadStatus("loading");
+      setVadError(null);
+
+      const { MicVAD } = await import("@ricky0123/vad-web");
+      const vad = await MicVAD.new({
+        baseAssetPath: vadAssetBasePath,
+        onnxWASMBasePath: onnxWasmBasePath,
+        model: "legacy",
+        startOnLoad: false,
+        submitUserSpeechOnPause: true,
+        onSpeechStart: () => {
+          if (vadRunIdRef.current !== runId) {
+            return;
+          }
+
+          openVadSegmentStartedAtRef.current = getRecordingElapsedMs();
+          setVadStatus("running");
+        },
+        onSpeechEnd: () => {
+          if (vadRunIdRef.current !== runId) {
+            return;
+          }
+
+          closeOpenVadSegment();
+          setVadStatus("running");
+        }
+      });
+
+      if (vadRunIdRef.current !== runId) {
+        await vad.destroy();
+        return;
+      }
+
+      vadRef.current = vad;
+      setVadStatus("ready");
+      await vad.start();
+
+      if (vadRunIdRef.current === runId) {
+        setVadStatus("running");
+      }
+    } catch (error) {
+      if (vadRunIdRef.current !== runId) {
+        return;
+      }
+
+      await cleanupVadInstance();
+      setVadStatus("error");
+      setVadError(
+        error instanceof Error
+          ? `Silero VAD could not start: ${error.message}`
+          : "Silero VAD could not start."
+      );
+    }
+  }
+
+  async function stopSileroVad(nextStatus: VadStatus = "stopped") {
+    const endMs = getRecordingElapsedMs();
+    closeOpenVadSegment(endMs);
+    await cleanupVadInstance();
+    setVadStatus(nextStatus);
+  }
+
+  function resetVadState(nextMode: VadMode = vadMode) {
+    vadRunIdRef.current += 1;
+    openVadSegmentStartedAtRef.current = null;
+    setVadSegments([]);
+    setVadError(null);
+    setRecordingElapsedMs(null);
+    setVadStatus(nextMode === "none" ? "disabled" : "idle");
+  }
+
   function clearRecording() {
     if (status === "recording") {
       discardOnStopRef.current = true;
       mediaRecorderRef.current?.stop();
     }
 
+    void cleanupVadInstance();
     cleanupRecorder();
     revokeAudioUrl();
     chunksRef.current = [];
@@ -200,6 +427,7 @@ function App() {
     setTranscriptionResult(null);
     setTranscriptionError(null);
     setStatus("idle");
+    resetVadState();
   }
 
   async function startRecording() {
@@ -226,6 +454,7 @@ function App() {
       setAudioBlob(null);
       setMetadata(emptyMetadata);
       chunksRef.current = [];
+      resetVadState(vadMode);
       discardOnStopRef.current = false;
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -246,10 +475,12 @@ function App() {
           discardOnStopRef.current = false;
           chunksRef.current = [];
           startedAtRef.current = null;
+          setRecordingElapsedMs(null);
           cleanupRecorder();
           return;
         }
 
+        void stopSileroVad(vadMode === "none" ? "disabled" : "stopped");
         const durationMs =
           startedAtRef.current === null
             ? null
@@ -266,13 +497,23 @@ function App() {
           sizeBytes: blob.size,
           durationMs
         });
+        setRecordingElapsedMs(durationMs);
         setStatus("stopped");
         cleanupRecorder();
       });
 
+      const runId = vadRunIdRef.current;
       recorder.start();
       setStatus("recording");
+      setRecordingElapsedMs(0);
+
+      if (vadMode === "silero") {
+        void startSileroVad(runId);
+      } else {
+        setVadStatus("disabled");
+      }
     } catch (error) {
+      void stopSileroVad(vadMode === "none" ? "disabled" : "error");
       cleanupRecorder();
       setStatus("error");
       setErrorMessage(
@@ -340,8 +581,14 @@ function App() {
 
   function stopRecording() {
     if (mediaRecorderRef.current?.state === "recording") {
+      void stopSileroVad(vadMode === "none" ? "disabled" : "stopped");
       mediaRecorderRef.current.stop();
     }
+  }
+
+  function handleVadModeChange(nextMode: VadMode) {
+    setVadMode(nextMode);
+    resetVadState(nextMode);
   }
 
   return (
@@ -476,6 +723,27 @@ function App() {
             <p className="error-message">{transcriptionError}</p>
           ) : null}
 
+          <div className="vad-controls">
+            <label className="field-label" htmlFor="vad-mode">
+              VAD mode
+            </label>
+            <select
+              id="vad-mode"
+              value={vadMode}
+              onChange={(event) =>
+                handleVadModeChange(event.target.value as VadMode)
+              }
+              disabled={status === "recording" || status === "requesting_permission"}
+            >
+              <option value="none">none</option>
+              <option value="silero">silero</option>
+            </select>
+            <p>
+              Silero VAD runs locally in the browser and is used only for speech
+              detection summary in this sprint.
+            </p>
+          </div>
+
           <div className="metadata-grid recording-grid">
             <div>
               <span>Status</span>
@@ -509,6 +777,82 @@ function App() {
               <audio controls src={audioUrl} />
             </div>
           ) : null}
+
+          <div className="vad-panel">
+            <div className="vad-panel-heading">
+              <div>
+                <h2>VAD summary</h2>
+                <p>Browser-side speech detection for the current recording.</p>
+              </div>
+              <span className={`status-pill status-${vadStatus}`}>
+                {vadStatus}
+              </span>
+            </div>
+
+            {vadMode === "none" ? (
+              <p className="vad-disabled">
+                VAD is disabled. Speech summary is unavailable in none mode.
+              </p>
+            ) : (
+              <>
+                {vadError ? <p className="vad-error">{vadError}</p> : null}
+
+                <div className="vad-summary-grid">
+                  <div>
+                    <span>Mode</span>
+                    <strong>{vadMode}</strong>
+                  </div>
+                  <div>
+                    <span>Status</span>
+                    <strong>{vadStatus}</strong>
+                  </div>
+                  <div>
+                    <span>Speech segments</span>
+                    <strong>{vadSummary.speechSegmentCount}</strong>
+                  </div>
+                  <div>
+                    <span>Speech duration ms</span>
+                    <strong>{vadSummary.detectedSpeechDurationMs}</strong>
+                  </div>
+                  <div>
+                    <span>Silence duration ms</span>
+                    <strong>
+                      {formatCountMetric(vadSummary.detectedSilenceDurationMs)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Speech ratio</span>
+                    <strong>{formatMetricPercent(vadSummary.speechRatio)}</strong>
+                  </div>
+                </div>
+
+                {vadSummary.warnings.length > 0 ? (
+                  <ul className="vad-warning-list">
+                    {vadSummary.warnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                <div>
+                  <span className="field-label">Speech start/end segments</span>
+                  {vadSegments.length > 0 ? (
+                    <ol className="vad-segment-list">
+                      {vadSegments.map((segment, index) => (
+                        <li key={`${segment.startMs}-${segment.endMs}-${index}`}>
+                          <span>startMs {segment.startMs}</span>
+                          <span>endMs {segment.endMs}</span>
+                          <span>durationMs {segment.durationMs}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="vad-disabled">No speech segments captured yet.</p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </section>
 
@@ -518,7 +862,7 @@ function App() {
             <h2>ASR transcript result</h2>
             <p>
               ASR transcript and WER/CER metrics are calculated after
-              transcription. VAD is not run in this task.
+              transcription.
             </p>
           </div>
           <span className={`status-pill status-${transcriptionStatus}`}>

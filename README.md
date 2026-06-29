@@ -13,12 +13,12 @@ Implemented so far:
 - VAD summary utility
 - TypeScript validation harness
 - browser recording UI skeleton
+- local Silero browser VAD summary
 - local OpenAI ASR transcription path
 - server-side WER/CER metrics against selected ground truth
 
 Not implemented yet:
 
-- VAD provider integrations
 - telephony
 
 ## Setup
@@ -82,9 +82,74 @@ Preview the production build:
 npm run preview
 ```
 
-The current UI supports ground-truth selection, local browser recording, and
-server-side OpenAI transcription with WER/CER metrics against the selected
-ground truth. It does not run VAD, telephony, or streaming STT yet.
+The current UI supports ground-truth selection, local browser recording, local
+Silero browser VAD summary, and server-side OpenAI transcription with WER/CER
+metrics against the selected ground truth. It does not run telephony or
+streaming STT yet.
+
+## Final v0 demo flow
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Configure environment:
+
+```bash
+cp .env.example .env
+```
+
+Set:
+
+```env
+OPENAI_API_KEY=your_api_key_here
+OPENAI_TRANSCRIBE_MODEL=gpt-4o-transcribe
+API_PORT=8787
+```
+
+3. Run the lab:
+
+```bash
+npm run dev
+```
+
+4. Open:
+
+```txt
+http://127.0.0.1:5173/
+```
+
+5. In the UI:
+
+- select a ground truth
+- choose VAD mode: `none` or `silero`
+- record audio
+- stop recording
+- review VAD summary if using `silero`
+- click `Transcribe recording`
+- review ASR transcript
+- review WER, CER, word accuracy, and token diff
+
+## Current v0 capabilities
+
+- browser recording
+- ground-truth selection
+- local Silero browser VAD summary
+- server-side OpenAI ASR
+- WER/CER/word accuracy metrics
+- English, Hindi, and Hinglish ground truths
+
+## Still not included
+
+- telephony
+- LiveKit
+- Twilio
+- streaming STT
+- database
+- raw audio storage
+- production deployment
 
 ## Source of truth
 
