@@ -1,8 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "CommonJS",
+    "module": "ESNext",
     "moduleResolution": "Node",
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -14,6 +16,9 @@
   "include": [
     "lib/**/*.ts",
     "examples/**/*.ts",
-    "tests/**/*.ts"
+    "tests/**/*.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "vite.config.ts"
   ]
 }
