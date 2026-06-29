@@ -14,6 +14,7 @@ Implemented so far:
 - TypeScript validation harness
 - browser recording UI skeleton
 - local OpenAI ASR transcription path
+- server-side WER/CER metrics against selected ground truth
 
 Not implemented yet:
 
@@ -82,8 +83,8 @@ npm run preview
 ```
 
 The current UI supports ground-truth selection, local browser recording, and
-server-side OpenAI transcription. It does not run VAD, WER/CER metrics,
-telephony, or streaming STT yet.
+server-side OpenAI transcription with WER/CER metrics against the selected
+ground truth. It does not run VAD, telephony, or streaming STT yet.
 
 ## Source of truth
 
