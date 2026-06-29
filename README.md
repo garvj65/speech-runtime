@@ -12,10 +12,10 @@ Implemented so far:
 - pure transcript metrics utilities
 - VAD summary utility
 - TypeScript validation harness
+- browser recording UI skeleton
 
 Not implemented yet:
 
-- browser recording UI
 - ASR provider integrations
 - VAD provider integrations
 - API routes
@@ -35,6 +35,28 @@ npm run example:metrics
 npm run test:metrics
 npm test
 ```
+
+## Browser UI
+
+Run the local lab UI:
+
+```bash
+npm run dev
+```
+
+Build the UI:
+
+```bash
+npm run build
+```
+
+Preview the production build:
+
+```bash
+npm run preview
+```
+
+The current UI supports ground-truth selection and local browser recording only. It does not run ASR, VAD, upload, telephony, or provider calls yet.
 
 ## Source of truth
 
