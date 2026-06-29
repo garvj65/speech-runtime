@@ -54,24 +54,24 @@ function calculateEditDistance(expected: string[], predicted: string[]): number 
   );
 
   for (let row = 1; row < rows; row += 1) {
-    matrix[row][0] = row;
+    matrix[row]![0] = row;
   }
 
   for (let column = 1; column < columns; column += 1) {
-    matrix[0][column] = column;
+    matrix[0]![column] = column;
   }
 
   for (let row = 1; row < rows; row += 1) {
     for (let column = 1; column < columns; column += 1) {
       const substitutionCost = expected[row - 1] === predicted[column - 1] ? 0 : 1;
 
-      matrix[row][column] = Math.min(
-        matrix[row - 1][column] + 1,
-        matrix[row][column - 1] + 1,
-        matrix[row - 1][column - 1] + substitutionCost
+      matrix[row]![column] = Math.min(
+        matrix[row - 1]![column]! + 1,
+        matrix[row]![column - 1]! + 1,
+        matrix[row - 1]![column - 1]! + substitutionCost
       );
     }
   }
 
-  return matrix[expected.length][predicted.length];
+  return matrix[expected.length]![predicted.length]!;
 }

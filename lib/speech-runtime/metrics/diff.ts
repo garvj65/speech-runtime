@@ -30,11 +30,11 @@ export function diffTokens(
   );
 
   for (let row = 1; row < rows; row += 1) {
-    matrix[row][0] = { cost: row, step: "deletion" };
+    matrix[row]![0] = { cost: row, step: "deletion" };
   }
 
   for (let column = 1; column < columns; column += 1) {
-    matrix[0][column] = { cost: column, step: "insertion" };
+    matrix[0]![column] = { cost: column, step: "insertion" };
   }
 
   for (let row = 1; row < rows; row += 1) {
@@ -45,15 +45,15 @@ export function diffTokens(
           : "substitution";
       const candidates: CandidateCell[] = [
         {
-          cost: matrix[row - 1][column - 1].cost + (diagonalStep === "match" ? 0 : 1),
+          cost: matrix[row - 1]![column - 1]!.cost + (diagonalStep === "match" ? 0 : 1),
           step: diagonalStep,
         },
         {
-          cost: matrix[row - 1][column].cost + 1,
+          cost: matrix[row - 1]![column]!.cost + 1,
           step: "deletion",
         },
         {
-          cost: matrix[row][column - 1].cost + 1,
+          cost: matrix[row]![column - 1]!.cost + 1,
           step: "insertion",
         },
       ];
@@ -64,9 +64,9 @@ export function diffTokens(
         }
 
         return STEP_PRIORITY[left.step] - STEP_PRIORITY[right.step];
-      })[0];
+      })[0]!;
 
-      matrix[row][column] = bestCandidate;
+      matrix[row]![column] = bestCandidate;
     }
   }
 
@@ -75,13 +75,13 @@ export function diffTokens(
   let column = predictedTokens.length;
 
   while (row > 0 || column > 0) {
-    const step = matrix[row][column].step;
+    const step = matrix[row]![column]!.step;
 
     if (step === "match") {
       operations.push({
         type: "match",
-        expected: expectedTokens[row - 1],
-        predicted: predictedTokens[column - 1],
+        expected: expectedTokens[row - 1]!,
+        predicted: predictedTokens[column - 1]!,
       });
       row -= 1;
       column -= 1;
@@ -91,8 +91,8 @@ export function diffTokens(
     if (step === "substitution") {
       operations.push({
         type: "substitution",
-        expected: expectedTokens[row - 1],
-        predicted: predictedTokens[column - 1],
+        expected: expectedTokens[row - 1]!,
+        predicted: predictedTokens[column - 1]!,
       });
       row -= 1;
       column -= 1;
@@ -102,7 +102,7 @@ export function diffTokens(
     if (step === "deletion") {
       operations.push({
         type: "deletion",
-        expected: expectedTokens[row - 1],
+        expected: expectedTokens[row - 1]!,
         predicted: null,
       });
       row -= 1;
@@ -112,7 +112,7 @@ export function diffTokens(
     operations.push({
       type: "insertion",
       expected: null,
-      predicted: predictedTokens[column - 1],
+      predicted: predictedTokens[column - 1]!,
     });
     column -= 1;
   }
