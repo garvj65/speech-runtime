@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   calculateCer,
+  calculateTranscriptQualityMetrics,
   calculateWer,
   normalizeTranscript,
   summarizeVadSegments,
@@ -29,6 +30,34 @@ assert.ok(missingCer.reason);
 
 const validCer = calculateCer("shaam", "sham");
 assert.equal(typeof validCer.cer, "number");
+
+const transcriptQuality = calculateTranscriptQualityMetrics(
+  "haan payment link whatsapp pe bhej do",
+  "haan payment link whatsapp par bhej do"
+);
+assert.equal(transcriptQuality.substitutions, 1);
+assert.ok(transcriptQuality.wer !== null);
+assert.ok(Math.abs(transcriptQuality.wer - 1 / 7) < 0.0001);
+assert.equal(typeof transcriptQuality.cer, "number");
+assert.equal(
+  transcriptQuality.tokenDiff.filter(
+    (operation) => operation.type === "substitution"
+  ).length,
+  1
+);
+
+const missingExpectedQuality = calculateTranscriptQualityMetrics(
+  null,
+  "free speech"
+);
+assert.equal(missingExpectedQuality.wer, null);
+assert.equal(missingExpectedQuality.cer, null);
+assert.ok(missingExpectedQuality.reason);
+
+const emptyExpectedQuality = calculateTranscriptQualityMetrics("", "free speech");
+assert.equal(emptyExpectedQuality.wer, null);
+assert.equal(emptyExpectedQuality.cer, null);
+assert.ok(emptyExpectedQuality.reason);
 
 const fullVad = summarizeVadSegments({
   audioDurationMs: 4200,

@@ -41,9 +41,30 @@ type AsrTranscriptionResult = {
   latencyMs: number;
 };
 
+type TokenDiffOperation =
+  | { type: "match"; expected: string; predicted: string }
+  | { type: "substitution"; expected: string; predicted: string }
+  | { type: "insertion"; expected: null; predicted: string }
+  | { type: "deletion"; expected: string; predicted: null };
+
+type TranscriptQualityMetrics = {
+  normalizedExpectedTranscript: string | null;
+  normalizedPredictedTranscript: string;
+  wer: number | null;
+  cer: number | null;
+  wordAccuracy: number | null;
+  substitutions: number | null;
+  insertions: number | null;
+  deletions: number | null;
+  tokenDiff: TokenDiffOperation[];
+  reason?: string;
+};
+
 type TranscriptionResponse = {
   selectedGroundTruthId: string | null;
+  expectedTranscript: string | null;
   asr: AsrTranscriptionResult;
+  transcriptQuality: TranscriptQualityMetrics;
 };
 
 const groundTruths = (groundTruthData as GroundTruthSet).items;
@@ -59,6 +80,34 @@ function formatValue(value: string | number | null): string {
 
 function formatOptionalValue(value: string | number | null): string {
   return value === null ? "not provided" : String(value);
+}
+
+function formatMetricValue(value: number | null): string {
+  return value === null ? "not available" : value.toFixed(4);
+}
+
+function formatMetricPercent(value: number | null): string {
+  return value === null ? "not available" : `${(value * 100).toFixed(2)}%`;
+}
+
+function formatCountMetric(value: number | null): string {
+  return value === null ? "not available" : String(value);
+}
+
+function formatTokenDiffOperation(operation: TokenDiffOperation): string {
+  if (operation.type === "substitution") {
+    return `${operation.expected} -> ${operation.predicted}`;
+  }
+
+  if (operation.type === "insertion") {
+    return `* ${operation.predicted}`;
+  }
+
+  if (operation.type === "deletion") {
+    return `* ${operation.expected}`;
+  }
+
+  return operation.expected;
 }
 
 function getRecordingFilename(mimeType: string | null): string {
@@ -468,8 +517,8 @@ function App() {
           <div>
             <h2>ASR transcript result</h2>
             <p>
-              VAD and WER/CER metrics are not run in this task. This task only
-              returns the first ASR transcript.
+              ASR transcript and WER/CER metrics are calculated after
+              transcription. VAD is not run in this task.
             </p>
           </div>
           <span className={`status-pill status-${transcriptionStatus}`}>
@@ -497,6 +546,12 @@ function App() {
                 <strong>{transcriptionResult.selectedGroundTruthId ?? "None"}</strong>
               </div>
               <div>
+                <span>Expected transcript</span>
+                <strong>
+                  {transcriptionResult.expectedTranscript ?? "not available"}
+                </strong>
+              </div>
+              <div>
                 <span>Language detected</span>
                 <strong>
                   {formatOptionalValue(transcriptionResult.asr.languageDetected)}
@@ -515,6 +570,122 @@ function App() {
               <p className="transcript-box predicted-transcript">
                 {transcriptionResult.asr.predictedTranscript}
               </p>
+            </div>
+
+            <div className="metrics-section">
+              <div className="panel-heading metrics-heading">
+                <div>
+                  <h2>Transcript quality metrics</h2>
+                  <p>Server-side comparison against the selected ground truth.</p>
+                </div>
+              </div>
+
+              {transcriptionResult.transcriptQuality.reason ? (
+                <p className="metrics-reason">
+                  {transcriptionResult.transcriptQuality.reason}
+                </p>
+              ) : null}
+
+              <div className="metadata-grid metrics-grid">
+                <div>
+                  <span>WER</span>
+                  <strong>
+                    {formatMetricValue(transcriptionResult.transcriptQuality.wer)}
+                  </strong>
+                  <small>
+                    {formatMetricPercent(transcriptionResult.transcriptQuality.wer)}
+                  </small>
+                </div>
+                <div>
+                  <span>CER</span>
+                  <strong>
+                    {formatMetricValue(transcriptionResult.transcriptQuality.cer)}
+                  </strong>
+                  <small>
+                    {formatMetricPercent(transcriptionResult.transcriptQuality.cer)}
+                  </small>
+                </div>
+                <div>
+                  <span>Word accuracy</span>
+                  <strong>
+                    {formatMetricValue(
+                      transcriptionResult.transcriptQuality.wordAccuracy
+                    )}
+                  </strong>
+                  <small>
+                    {formatMetricPercent(
+                      transcriptionResult.transcriptQuality.wordAccuracy
+                    )}
+                  </small>
+                </div>
+                <div>
+                  <span>Substitutions</span>
+                  <strong>
+                    {formatCountMetric(
+                      transcriptionResult.transcriptQuality.substitutions
+                    )}
+                  </strong>
+                </div>
+                <div>
+                  <span>Insertions</span>
+                  <strong>
+                    {formatCountMetric(
+                      transcriptionResult.transcriptQuality.insertions
+                    )}
+                  </strong>
+                </div>
+                <div>
+                  <span>Deletions</span>
+                  <strong>
+                    {formatCountMetric(
+                      transcriptionResult.transcriptQuality.deletions
+                    )}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="normalized-grid">
+                <div>
+                  <span className="field-label">
+                    Normalized expected transcript
+                  </span>
+                  <p className="transcript-box normalized-transcript">
+                    {transcriptionResult.transcriptQuality
+                      .normalizedExpectedTranscript ?? "not available"}
+                  </p>
+                </div>
+                <div>
+                  <span className="field-label">
+                    Normalized predicted transcript
+                  </span>
+                  <p className="transcript-box normalized-transcript">
+                    {transcriptionResult.transcriptQuality
+                      .normalizedPredictedTranscript || "not available"}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <span className="field-label">Token diff</span>
+                {transcriptionResult.transcriptQuality.tokenDiff.length > 0 ? (
+                  <ol className="token-diff-list">
+                    {transcriptionResult.transcriptQuality.tokenDiff.map(
+                      (operation, index) => (
+                        <li key={`${operation.type}-${index}`}>
+                          <span
+                            className={`operation-label operation-${operation.type}`}
+                          >
+                            {operation.type}
+                          </span>
+                          <span>{formatTokenDiffOperation(operation)}</span>
+                        </li>
+                      )
+                    )}
+                  </ol>
+                ) : (
+                  <p className="empty-result">not available</p>
+                )}
+              </div>
             </div>
           </div>
         ) : (
