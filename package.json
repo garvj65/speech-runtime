@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "example:metrics": "tsx examples/metrics-example.ts",
     "test:metrics": "tsx tests/metrics-smoke.test.ts",
-    "test": "npm run typecheck && npm run test:metrics"
+    "test:asr-language": "tsx tests/asr-language-hints.test.ts",
+    "test": "npm run typecheck && npm run test:metrics && npm run test:asr-language"
   },
   "dependencies": {
     "@ricky0123/vad-web": "^0.0.30",

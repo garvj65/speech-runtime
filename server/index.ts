@@ -2,7 +2,10 @@ import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import multer from "multer";
-import { createOpenAiAsrProvider } from "../lib/speech-runtime/asr";
+import {
+  createOpenAiAsrProvider,
+  getOpenAiTranscriptionHints,
+} from "../lib/speech-runtime/asr";
 import type { TranscriptQualityMetrics } from "../lib/speech-runtime/types";
 import {
   calculateTranscriptQualityMetrics,
@@ -99,14 +102,17 @@ app.post("/api/transcribe", upload.single("audio"), async (request, response) =>
     const selectedGroundTruthId = getSelectedGroundTruthId(
       request.body.selectedGroundTruthId
     );
+    const transcriptionHints = getOpenAiTranscriptionHints(
+      typeof request.body.languageHint === "string"
+        ? request.body.languageHint
+        : null
+    );
     const asr = await provider.transcribe({
       audioBuffer: audioFile.buffer,
       filename: audioFile.originalname || "recording.webm",
       mimeType: audioFile.mimetype || "audio/webm",
-      languageHint:
-        typeof request.body.languageHint === "string"
-          ? request.body.languageHint
-          : null
+      languageHint: transcriptionHints.language,
+      prompt: transcriptionHints.prompt
     });
     const selectedGroundTruth = findGroundTruthById(selectedGroundTruthId);
     const expectedTranscript = selectedGroundTruth?.expectedTranscript ?? null;
