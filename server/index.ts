@@ -110,7 +110,10 @@ app.post("/api/transcribe", upload.single("audio"), async (request, response) =>
     );
     const requestedModel =
       typeof request.body.asrModel === "string" ? request.body.asrModel : null;
-    const asrModel = getOpenAiTranscriptionModel(requestedModel);
+    const asrModel =
+      requestedModel === null
+        ? null
+        : getOpenAiTranscriptionModel(requestedModel);
     const asr = await provider.transcribe({
       audioBuffer: audioFile.buffer,
       filename: audioFile.originalname || "recording.webm",
