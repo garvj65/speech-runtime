@@ -87,6 +87,12 @@ type TranscriptionResponse = {
   transcriptQuality: TranscriptQualityMetrics;
 };
 
+const openAiTranscriptionModels = [
+  "gpt-4o-transcribe",
+  "gpt-4o-mini-transcribe",
+  "whisper-1"
+] as const;
+
 type VadSummary = {
   speechSegmentCount: number;
   detectedSpeechDurationMs: number;
@@ -229,6 +235,10 @@ function App() {
   const [recordingElapsedMs, setRecordingElapsedMs] = useState<number | null>(
     null
   );
+  const [selectedAsrModel, setSelectedAsrModel] =
+    useState<(typeof openAiTranscriptionModels)[number]>(
+      "gpt-4o-transcribe"
+    );
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -552,6 +562,8 @@ function App() {
         formData.append("languageHint", selectedGroundTruth.languageMode);
       }
 
+      formData.append("asrModel", selectedAsrModel);
+
       const response = await fetch("/api/transcribe", {
         method: "POST",
         body: formData
@@ -744,6 +756,29 @@ function App() {
             </p>
           </div>
 
+          <div className="vad-controls">
+            <label className="field-label" htmlFor="asr-model">
+              OpenAI ASR model
+            </label>
+            <select
+              id="asr-model"
+              value={selectedAsrModel}
+              onChange={(event) =>
+                setSelectedAsrModel(
+                  event.target
+                    .value as (typeof openAiTranscriptionModels)[number]
+                )
+              }
+              disabled={transcriptionStatus === "transcribing"}
+            >
+              {openAiTranscriptionModels.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="metadata-grid recording-grid">
             <div>
               <span>Status</span>
@@ -768,6 +803,10 @@ function App() {
             <div>
               <span>Transcription status</span>
               <strong>{transcriptionStatus}</strong>
+            </div>
+            <div>
+              <span>OpenAI ASR model</span>
+              <strong>{selectedAsrModel}</strong>
             </div>
           </div>
 

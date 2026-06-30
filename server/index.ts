@@ -5,6 +5,7 @@ import multer from "multer";
 import {
   createOpenAiAsrProvider,
   getOpenAiTranscriptionHints,
+  getOpenAiTranscriptionModel,
 } from "../lib/speech-runtime/asr";
 import type { TranscriptQualityMetrics } from "../lib/speech-runtime/types";
 import {
@@ -107,11 +108,18 @@ app.post("/api/transcribe", upload.single("audio"), async (request, response) =>
         ? request.body.languageHint
         : null
     );
+    const requestedModel =
+      typeof request.body.asrModel === "string" ? request.body.asrModel : null;
+    const asrModel =
+      requestedModel === null
+        ? null
+        : getOpenAiTranscriptionModel(requestedModel);
     const asr = await provider.transcribe({
       audioBuffer: audioFile.buffer,
       filename: audioFile.originalname || "recording.webm",
       mimeType: audioFile.mimetype || "audio/webm",
       languageHint: transcriptionHints.language,
+      model: asrModel,
       prompt: transcriptionHints.prompt
     });
     const selectedGroundTruth = findGroundTruthById(selectedGroundTruthId);

@@ -70,6 +70,17 @@ The local API server runs on `http://127.0.0.1:8787/`.
 The browser sends recorded audio to the local API server. The OpenAI API key
 stays server-side.
 
+## OpenAI ASR model selection
+
+The dashboard supports selecting one of three OpenAI transcription models:
+
+- `gpt-4o-transcribe`
+- `gpt-4o-mini-transcribe`
+- `whisper-1`
+
+The selected model is sent to the local API server and validated against an
+allowlist before calling OpenAI.
+
 Build the UI:
 
 ```bash
