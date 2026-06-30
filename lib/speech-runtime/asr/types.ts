@@ -5,6 +5,7 @@ export type AsrTranscriptionRequest = {
   filename: string;
   mimeType: string;
   languageHint?: string | null;
+  model?: string | null;
   prompt?: string | null;
 };
 

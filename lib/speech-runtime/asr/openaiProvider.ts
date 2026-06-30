@@ -5,8 +5,8 @@ import type {
   AsrTranscriptionRequest,
   AsrTranscriptionResult
 } from "./types";
+import { getOpenAiTranscriptionModel } from "./openAiModels";
 
-const defaultModel = "gpt-4o-transcribe";
 const missingApiKeyMessage =
   "OPENAI_API_KEY is required for OpenAI transcription.";
 const missingTextMessage =
@@ -38,7 +38,9 @@ export function createOpenAiAsrProvider(): AsrProvider {
         throw new Error(missingApiKeyMessage);
       }
 
-      const model = process.env.OPENAI_TRANSCRIBE_MODEL || defaultModel;
+      const model = getOpenAiTranscriptionModel(
+        request.model || process.env.OPENAI_TRANSCRIBE_MODEL || null
+      );
       const openai = new OpenAI({ apiKey });
       const file = await toFile(request.audioBuffer, request.filename, {
         type: request.mimeType
